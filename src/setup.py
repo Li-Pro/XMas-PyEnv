@@ -24,7 +24,13 @@ class XMEnv:
 		except:
 			return False
 	
-	def setupBinary(self, rt_dir, env_dir):
+	def setupConfig(self, env_dir, setup_dir):
+		cfg = setup_dir / 'pyvenv.cfg'
+		assert( cfg.is_file() )
+		
+		shutil.copy2(cfg, env_dir)
+	
+	def setupBinary(self, env_dir, rt_dir):
 		copy_list = {'': ['python', 'python_d', 'pythonw', 'pythonw_d'], 'scripts': ['pip']}
 		for copy_suf in copy_list:
 			copy_files = copy_list[copy_suf]
@@ -49,6 +55,27 @@ class XMEnv:
 			except:
 				raise
 	
+	def setupScripts(self, env_dir, script_dir):
+		paths = os.environ['path']
+		for addpaths in (env_dir / 'bin', env_dir / 'bin' / 'scripts'):
+			paths = '{}{}{}'.format(addpaths.absolute(), os.pathsep, paths)
+		
+		XM_ENVNAME = 'xm-{}'.format(self.envdest)
+		XM_ENVPATHS = paths
+		replace_tokens = {'%--XM_ENVNAME%': XM_ENVNAME, '%--XM_ENVPATHS%': XM_ENVPATHS}
+		
+		for script in script_dir.iterdir():
+			assert( script.is_file() )
+			
+			newfile = env_dir / (script.name)
+			with open(newfile, 'w', encoding='utf-8') as nf, script.open() as sf:
+				sfdata = sf.read()
+				for tok in replace_tokens:
+					sfdata = sfdata.replace(tok, replace_tokens[tok])
+				
+				nf.write(sfdata)
+		
+	
 	def setupEnv(self):
 		# abort for non-empty dst
 		# substitute %--XM_*% template variable (%--XM_ENVNAME%, %--XM_ENVPATHS%)
@@ -57,8 +84,7 @@ class XMEnv:
 		
 		# prepare env & rt
 		try:
-			rt_exe = Path(self.envrt)
-			rt_dir = rt_exe.parent.resolve()
+			rt_dir = Path(self.envrt).resolve()
 			assert( rt_dir.is_dir() )
 		except:
 			raise # ValueError('Invalid Python runtime.')
@@ -67,33 +93,28 @@ class XMEnv:
 			env_dir = Path(self.envdest).resolve()
 			assert( self._isValidDir(env_dir) )
 			
-			env_bin = env_dir / 'bin'
-			
-			
-			# assert( not env_dir.is_file() )
+			env_bindir = env_dir / 'bin'
 		except:
 			raise # ValueError('Invalid destination.')
 		else:
-			# if env_dir.is_dir() and len([*env_dir.iterdir()]) > 0:
-				# raise ValueError('Destination is not empty.')
-			# else:
-				
 			env_dir.mkdir(exist_ok=True)
+			env_bindir.mkdir()
 		
 		try:
-			script_dir = (Path(__file__).parent / 'scripts').resolve()
+			setup_dir = (Path(__file__).parent).resolve()
+			assert(setup_dir.is_dir())
+			
+			script_dir = setup_dir / 'xmscripts'
 			assert(script_dir.is_dir())
 		except:
-			raise
+			raise # ValueError('Corrupted setup scripts.')
 		
 		# copy runtime binaries
-		self.setupConfig(env_dir)
-		self.setupBinary(rt_dir, env_dir)
+		self.setupConfig(env_dir, setup_dir)
+		self.setupBinary(env_bindir, rt_dir)
 		
 		# pack templates
-		
-		
-		paths = os.environ['path'].split(os.pathsep)
+		self.setupScripts(env_dir, script_dir)
 		
 		return
 
@@ -121,7 +142,7 @@ def runWithOptions(options):
 	arg = parser.parse(options)
 	
 	if arg != None:
-		env = XMEnv(arg.dest, sys.executable)
+		env = XMEnv(arg.dest, sys.prefix)
 		env.setupEnv()
 
 if __name__ == "__main__":
