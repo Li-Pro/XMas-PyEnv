@@ -31,7 +31,7 @@ class XMEnv:
 		shutil.copy2(cfg, env_dir)
 	
 	def setupBinary(self, env_dir, rt_dir):
-		copy_list = {'': ['python', 'python_d', 'pythonw', 'pythonw_d'], 'scripts': ['pip']}
+		copy_list = {'': ['python', 'python_d', 'pythonw', 'pythonw_d']}
 		for copy_suf in copy_list:
 			copy_files = copy_list[copy_suf]
 			
@@ -45,19 +45,14 @@ class XMEnv:
 				for file in copy_dir.iterdir():
 					for matchname in copy_files:
 						if file.name.startswith(matchname):
-							# print(file.absolute())
 							shutil.copy2(file, env_cdir)
 							break
-				
-				# for file in copy_files:
-					# print((copy_dir / file))
-					# assert( (copy_dir / file).is_file() )
 			except:
 				raise
 	
 	def setupScripts(self, env_dir, script_dir):
 		paths = os.environ['path']
-		for addpaths in (env_dir / 'bin', env_dir / 'bin' / 'scripts'):
+		for addpaths in (env_dir, env_dir / 'bin'):
 			paths = '{}{}{}'.format(addpaths.absolute(), os.pathsep, paths)
 		
 		XM_ENVNAME = 'xm-{}'.format(self.envdest)
