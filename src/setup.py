@@ -1,5 +1,6 @@
 # import argparse
 import os
+import shutil
 import sys
 import types
 from io  import StringIO
@@ -15,6 +16,38 @@ class XMEnv:
 	def __init__(self, dest, pyrt):
 		self.envdest = dest
 		self.envrt = pyrt
+	
+	@classmethod
+	def _isValidDir(cls, p):
+		try:
+			return (not p.is_file()) and (not (p.is_dir() and len([*p.iterdir()]) > 0))
+		except:
+			return False
+	
+	def setupBinary(self, rt_dir, env_dir):
+		copy_list = {'': ['python', 'python_d', 'pythonw', 'pythonw_d'], 'scripts': ['pip']}
+		for copy_suf in copy_list:
+			copy_files = copy_list[copy_suf]
+			
+			try:
+				copy_dir = rt_dir / copy_suf
+				assert( copy_dir.is_dir() )
+				
+				env_cdir = env_dir / copy_suf
+				env_cdir.mkdir(exist_ok=True)
+				
+				for file in copy_dir.iterdir():
+					for matchname in copy_files:
+						if file.name.startswith(matchname):
+							# print(file.absolute())
+							shutil.copy2(file, env_cdir)
+							break
+				
+				# for file in copy_files:
+					# print((copy_dir / file))
+					# assert( (copy_dir / file).is_file() )
+			except:
+				raise
 	
 	def setupEnv(self):
 		# abort for non-empty dst
@@ -32,24 +65,33 @@ class XMEnv:
 		
 		try:
 			env_dir = Path(self.envdest).resolve()
-			assert( not env_dir.is_file() )
+			assert( self._isValidDir(env_dir) )
+			
+			env_bin = env_dir / 'bin'
+			
+			
+			# assert( not env_dir.is_file() )
 		except:
 			raise # ValueError('Invalid destination.')
 		else:
-			if env_dir.is_dir() and len([*env_dir.iterdir()]) > 0:
-				raise ValueError('Destination is not empty.')
+			# if env_dir.is_dir() and len([*env_dir.iterdir()]) > 0:
+				# raise ValueError('Destination is not empty.')
+			# else:
+				
+			env_dir.mkdir(exist_ok=True)
 		
-		
-		# copy runtime binaries
-		copy_list = {'': ['python', 'python_d', 'pythonw', 'pythonw_d'], 'scripts': ['pip']}
-		
-		
-		# pack templates
 		try:
 			script_dir = (Path(__file__).parent / 'scripts').resolve()
 			assert(script_dir.is_dir())
 		except:
 			raise
+		
+		# copy runtime binaries
+		self.setupConfig(env_dir)
+		self.setupBinary(rt_dir, env_dir)
+		
+		# pack templates
+		
 		
 		paths = os.environ['path'].split(os.pathsep)
 		
